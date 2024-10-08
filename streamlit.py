@@ -147,239 +147,160 @@ if menu=="Home":
                 To Scrape the Data from Redbus Website and to create a user interface and 
      dynamic filtration of data using streamlit and SQL 
     """)
+        
+    # Load and preprocess data
     
-    dfbus=pd.read_csv("h:/guvi_txt/new/combined_output.csv")#h:/guvi_txt/new
+    dfbus = pd.read_csv("h:/guvi_txt/new/combined_output.csv")
     dfbus['seats_available'] = dfbus['seats_available'].fillna(0)
     dfbus['number_of_customer_reviews'] = dfbus['number_of_customer_reviews'].fillna(0)
     dfbus['star_rating'] = dfbus['star_rating'].fillna(0)
-    
-    fig = px.scatter(dfbus, 
-                 x='price', 
-                 y='star_rating', 
-                 color='bus_type',
-                 size='seats_available',
-                 hover_name='bus_name',
-                 title='Bus Price vs Ratings',
-                 labels={'price': 'Ticket Price', 'star_rating': 'Bus Ratings'})
 
-    # Display the plot in Streamlit
-    st.plotly_chart(fig)
-    
-    st.text("")
-    
-    labels = dfbus['seats_available']
-    values = dfbus['star_rating']
-    
-    
-    fig1 = px.scatter(dfbus, 
-                 x='price', 
-                 y='number_of_customer_reviews', 
-                 color='bus_type',
-                 size='star_rating',
-                 hover_name='bus_name',
-                 title='Bus Price vs number_of_customer_reviews',
-                 labels={'price': 'Ticket Price', 'number_of_customer_reviews': 'reviews'})
+    # Classify buses as government or private
+    dfbus['bus_category'] = dfbus['bus_name'].apply(lambda x: 'government' if any(keyword in x for keyword in 
+        ['APSRTC', 'KSRTC', 'CTU', 'UPSRTC', 'RSRTC', 'BSRTC', 'PEPSU', 'TSRTC', 'HRTC', 
+        'Assam State Transport Corporation', 'KAAC', 'KTCL', 'SNT', 'TGSRTC']) else 'private')
 
-    # Display the plot in Streamlit
-    st.plotly_chart(fig1)
-    
-    st.text("")
-    
-    labels1 = dfbus['star_rating']
-    values1 = dfbus['number_of_customer_reviews']
-
-        
-    # Separate government and private buses
-    dfbus['bus_type'] = dfbus['bus_name'].apply(lambda x: 'government' if any(keyword in x for keyword in 
-        ['APSRTC', 'KSRTC', 'CTU', 'UPSRTC', 'RSRTC', 'BSRTC', 'PEPSU', 'TSRTC', 'HRTC', 'Assam State Transport Corporation', 
-        'KAAC', 'KTCL', 'SNT', 'TGSRTC']) else 'private')
-
-    # Filter buses with zero customer reviews and zero star ratings
+    # Filter buses with zero reviews and zero star ratings
     zero_reviews = dfbus[dfbus['number_of_customer_reviews'] == 0]
     zero_star_ratings = dfbus[dfbus['star_rating'] == 0]
-    # Step 1: Filter out government buses only
-    gov_buses = dfbus[dfbus['bus_type'] == 'government']
+    zero_both = dfbus[(dfbus['star_rating'] == 0) & (dfbus['number_of_customer_reviews'] == 0)]
+    
 
-    # Step 2: Group by each specific government bus (using `bus_name`) for zero reviews and zero star ratings
-    # Count zero star ratings
-    zero_star_ratings_grouped = gov_buses[gov_buses['star_rating'] == 0].groupby('bus_name').size().reset_index(name='zero_star_rating_count')
+    # General scatter plot: Price vs Reviews with government/private distinction
+    shape_map = {'government': 'square', 'private': 'triangle-up'}  # square for gov, triangle for private
 
-    # Count zero reviews
-    zero_reviews_grouped = gov_buses[gov_buses['number_of_customer_reviews'] == 0].groupby('bus_name').size().reset_index(name='zero_review_count')
-
-    # Step 3: Merge the two counts (zero star ratings and zero reviews) into one DataFrame
-    gov_zero_grouped = pd.merge(zero_star_ratings_grouped, zero_reviews_grouped, on='bus_name', how='outer').fillna(0)
-
-    # Optional: Sort by bus_name or any other criteria
-    gov_zero_grouped = gov_zero_grouped.sort_values('bus_name')
-
-
-
-    # Scatter plot with lines and spikes
-    fig2 = px.scatter(dfbus, 
+    fig = px.scatter(dfbus, 
                     x='price', 
                     y='number_of_customer_reviews', 
-                    color='bus_type',  # Distinguishing between government and private buses
+                    color='bus_type',
                     size='star_rating',
+                    symbol='bus_category',  
+                    symbol_map=shape_map,
                     hover_name='bus_name',
                     title='Bus Price vs Number of Customer Reviews',
                     labels={'price': 'Ticket Price', 'number_of_customer_reviews': 'Number of Reviews'})
 
-    # Adding separate traces for zero reviews and zero star rating buses
+    # Add markers for zero reviews, star ratings, and both
+    fig.add_scatter(x=zero_reviews['price'], y=zero_reviews['number_of_customer_reviews'],
+                    mode='markers', marker=dict(size=15, symbol='circle-open', line=dict(width=2, color='red')),
+                    name='Zero Reviews (Red Encircled)', showlegend=True)
 
-    # Define colors for better contrast
-    color_map = {'government': 'blue', 'private': 'orange'}
+    fig.add_scatter(x=zero_star_ratings['price'], y=zero_star_ratings['number_of_customer_reviews'],
+                    mode='markers', marker=dict(size=15, symbol='circle-open', line=dict(width=2, color='green')),
+                    name='Zero Star Ratings (Green Encircled)', showlegend=True)
 
-    # Plot 1: Price vs Number of Customer Reviews
-    fig3 = px.scatter(dfbus, 
-                    x='price', 
-                    y='number_of_customer_reviews', 
-                    color='bus_type',
-                    color_discrete_map=color_map,
-                    size='star_rating',
-                    hover_name='bus_name',
-                    title='Price vs Number of Customer Reviews',
-                    labels={'price': 'Ticket Price', 'number_of_customer_reviews': 'Number of Reviews'})
+    fig.add_scatter(x=zero_both['price'], y=zero_both['number_of_customer_reviews'],
+                    mode='markers', marker=dict(size=15, symbol='circle-open', line=dict(width=2, color='blue')),
+                    name='Zero Reviews & Ratings (Blue Encircled)', showlegend=True)
 
-    # Plot 2: Price vs Star Rating
-    fig4 = px.scatter(dfbus, 
-                    x='price', 
-                    y='star_rating', 
-                    color='bus_type',
-                    color_discrete_map=color_map,
-                    size='number_of_customer_reviews',
-                    hover_name='bus_name',
-                    title='Price vs Star Rating',
-                    labels={'price': 'Ticket Price', 'star_rating': 'Star Rating'})
+    # Display the main scatter plot
+    st.plotly_chart(fig)
 
-    # Plot 3: Star Rating vs Number of Customer Reviews
+    # Add explanation text for encircled categories
+    st.text("Red: Zero Reviews | Green: Zero Star Ratings | Blue: Both Zero Reviews & Star Ratings")
+
+    # Display counts for bus types and zero rating categories
+    st.text(f"Government buses (square): {dfbus[dfbus['bus_category'] == 'government'].shape[0]} buses")
+    st.text(f"Private buses (triangle): {dfbus[dfbus['bus_category'] == 'private'].shape[0]} buses")
+    st.text(f"Zero reviews: {zero_reviews.shape[0]} buses | Zero star ratings: {zero_star_ratings.shape[0]} buses")
+    st.text(f"Buses with both zero reviews and star ratings: {zero_both.shape[0]} buses")
+
+    # Additional scatter plots: Star Rating vs Reviews
     fig5 = px.scatter(dfbus, 
                     x='star_rating', 
                     y='number_of_customer_reviews', 
-                    color='bus_type',
-                    color_discrete_map=color_map,
+                    color='bus_category',
                     size='price',
                     hover_name='bus_name',
                     title='Star Rating vs Number of Customer Reviews',
                     labels={'star_rating': 'Star Rating', 'number_of_customer_reviews': 'Number of Reviews'})
 
-    # Add separate traces for zero reviews and zero star ratings in the Price vs Reviews plot (fig1)
-    fig3.add_scatter(x=zero_reviews['price'], 
-                    y=zero_reviews['number_of_customer_reviews'], 
-                    mode='markers+lines',
-                    name='Zero Reviews (Gov/Private)',
-                    line=dict(color='green', dash='dash'))
+    # Adding lines for zero star ratings and reviews
+    fig5.add_scatter(x=zero_star_ratings['star_rating'], y=zero_star_ratings['number_of_customer_reviews'],
+                    mode='markers+lines', name='Zero Star Ratings', line=dict(color='red', dash='dot'))
 
-    fig3.add_scatter(x=zero_star_ratings['price'], 
-                    y=zero_star_ratings['number_of_customer_reviews'], 
-                    mode='markers+lines',
-                    name='Zero Star Ratings (Gov/Private)',
-                    line=dict(color='red', dash='dot'))
+    fig5.add_scatter(x=zero_reviews['star_rating'], y=zero_reviews['number_of_customer_reviews'],
+                    mode='markers+lines', name='Zero Reviews', line=dict(color='green', dash='dash'))
 
-    # Add separate traces in the Price vs Star Rating plot (fig2)
-    fig4.add_scatter(x=zero_reviews['price'], 
-                    y=zero_reviews['star_rating'], 
-                    mode='markers+lines',
-                    name='Zero Reviews (Gov/Private)',
-                    line=dict(color='green', dash='dash'))
-
-    fig4.add_scatter(x=zero_star_ratings['price'], 
-                    y=zero_star_ratings['star_rating'], 
-                    mode='markers+lines',
-                    name='Zero Star Ratings (Gov/Private)',
-                    line=dict(color='red', dash='dot'))
-
-    # Add separate traces in the Star Rating vs Reviews plot (fig3)
-    fig5.add_scatter(x=zero_star_ratings['star_rating'], 
-                    y=zero_star_ratings['number_of_customer_reviews'], 
-                    mode='markers+lines',
-                    name='Zero Star Ratings (Gov/Private)',
-                    line=dict(color='red', dash='dot'))
-
-    fig5.add_scatter(x=zero_reviews['star_rating'], 
-                    y=zero_reviews['number_of_customer_reviews'], 
-                    mode='markers+lines',
-                    name='Zero Reviews (Gov/Private)',
-                    line=dict(color='green', dash='dash'))
-
-    # Show the plots
-    st.plotly_chart(fig3)
-    st.plotly_chart(fig4)
+    # Display the scatter plot
     st.plotly_chart(fig5)
-    
 
-
-    # Step 1: Filter buses with zero star ratings and zero reviews
-    
+    # Filter data for price <= 12,000 and group by bus_name & type for zero reviews and ratings
     zero_reviews_df = dfbus[(dfbus['number_of_customer_reviews'] == 0) & (dfbus['price'] <= 12000)]
-
     zero_star_df = dfbus[(dfbus['star_rating'] == 0) & (dfbus['price'] <= 12000)]
 
-# Step 3: Group by bus type and count the number of buses with zero star rating
-    bus_count = zero_star_df.groupby(['bus_name', 'bus_type']).size().reset_index(name='count')
-    # Step 3: Group by both 'bus_name' and 'bus_type' to get details of buses with zero reviews
+    # Group by bus type and count for bar charts
+    bus_count_reviews = zero_reviews_df.groupby(['bus_name', 'bus_category','bus_type']).size().reset_index(name='count')
+    bus_count_star = zero_star_df.groupby(['bus_name', 'bus_category','reaching_time']).size().reset_index(name='count')
     
-    fig6 = px.bar(bus_count, 
-                    x='bus_type', 
-                    y='count', 
-                    color='bus_type', 
-                    title='Count of Buses with Zero Star Ratings (Price <= 12,000)',
-                    labels={'bus_type': 'Bus Type', 'count': 'Bus Count'},
-                    hover_data=['bus_name'],  # Adding bus_name to hover data for details
-                    color_discrete_map={'government': 'blue', 'private': 'orange'})
-
-        
-        
-
-
-
-
-        # Step 3: Group by price range and bus type, then count buses for each category
-        # Zero star rating buses
-   
-    # Zero review buses
-    bus_count = zero_reviews_df.groupby(['bus_name', 'bus_type']).size().reset_index(name='count')
-
-    # Step 4: Plot the bar chart
-    # Step 4: Plot the bar chart for buses with zero reviews
-    fig7 = px.bar(bus_count, 
-                    x='bus_type', 
-                    y='count', 
-                    color='bus_type', 
-                    title='Count of Buses with Zero Reviews (Price <= 12,000)',
-                    labels={'bus_type': 'Bus Type', 'count': 'Bus Count'},
-                    hover_data=['bus_name'],  # Adding bus_name to hover data for details
-                    color_discrete_map={'government': 'blue', 'private': 'orange'})
-
-        # Step 3: Group by price range and bus type, then count buses for each category
-   
-    # Optional: Combine zero star ratings and zero reviews into a single plot (if needed)
-   
-    # Step 5: Show the plots
-    st.plotly_chart(fig7)
+# Apply the function
+    # Plot bar charts for zero reviews and zero star ratings
+    fig6 = px.bar(bus_count_reviews, x='bus_category', y='count', color='bus_type',
+                title='Count of Buses with Zero Reviews (Price <= 12,000)', labels={'count': 'Bus Count'})
     st.plotly_chart(fig6)
-    bus_count_reviews = zero_reviews_df.groupby('bus_type').size().reset_index(name='count')
-    bus_count_star = zero_star_df.groupby('bus_type').size().reset_index(name='count')
+    
+
+    # Define time range categories
+    time_ranges = {
+        "06:00 - 12:00": ("06:00", "12:00"), 
+        "12:00 - 18:00": ("12:00", "18:00"), 
+        "18:00 - 24:00": ("18:00", "24:00"),
+        "00:00 - 06:00": ("00:00", "06:00")
+    }
+
+    # Function to categorize time into the specified ranges
+    def categorize_time(reaching_time):
+        reaching_time = pd.to_datetime(reaching_time, format='%H:%M').time()  # Convert to time object
+        for label, (start_time, end_time) in time_ranges.items():
+            if start_time <= reaching_time.strftime('%H:%M') < end_time:
+                return label
+        return "Unknown"
+
+    # Convert 'reaching_time' column to datetime and categorize
+    dfbus['reaching_time'] = pd.to_datetime(dfbus['reaching_time'], format='%H:%M')
+    dfbus['time_range'] = dfbus['reaching_time'].apply(categorize_time)
+    zero_star_df = dfbus[(dfbus['star_rating'] == 0) & (dfbus['price'] <= 12000)]
 
 
-    # Pie chart for zero star ratings (fig8)
-    fig8 = px.pie(bus_count_star, 
-                names='bus_type', 
-                values='count', 
-                title='Proportion of Buses with Zero Star Ratings (Price <= 12,000)',
-                color_discrete_map=color_map)
+    # Now group by the 'time_range' and get the count for each category
+    bus_count_star = zero_star_df.groupby(['time_range','bus_category']).size().reset_index(name='count')
+    
 
-    # Pie chart for zero reviews (fig9)
-    fig9 = px.pie(bus_count_reviews, 
-                names='bus_type', 
-                values='count', 
-                title='Proportion of Buses with Zero Reviews (Price <= 12,000)',
-                color_discrete_map=color_map)
+    # Create bar plot with the aggregated time ranges on the x-axis
+    fig7 = px.bar(
+        bus_count_star, 
+        x='time_range', 
+        y='count', 
+        color='bus_category',
+        title='Count of Buses with Zero Star Ratings (Grouped by Time Ranges)',
+        labels={'time_range': 'Reaching Time Range', 'count': 'Bus Count'}
+    )
+
+    # Sort time ranges for correct ordering in x-axis
+    time_order = ["00:00 - 06:00", "06:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+    fig7.update_xaxes(categoryorder='array', categoryarray=time_order)
+
+    # Display the plot
+    st.plotly_chart(fig7)
+
+
+    # Group by bus_type for pie charts
+    bus_count_reviews_type = zero_reviews_df.groupby('bus_type').size().reset_index(name='count')
+    bus_count_star_type = zero_star_df.groupby('bus_type').size().reset_index(name='count')
+
+    # Pie chart for zero star ratings
+    fig8 = px.pie(bus_count_star_type, names='bus_type', values='count', 
+                title='Proportion of Buses with Zero Star Ratings (Price <= 12,000)')
+
+    # Pie chart for zero reviews
+    fig9 = px.pie(bus_count_reviews_type, names='bus_type', values='count', 
+                title='Proportion of Buses with Zero Reviews (Price <= 12,000)')
+
+    # Display pie charts
     st.plotly_chart(fig8)
     st.plotly_chart(fig9)
-    
 
-  #Function to plot Customer Reviews vs Star Rating
+    #Function to plot Customer Reviews vs Star Rating
     
     
 
@@ -494,76 +415,95 @@ if menu == "Bus Routes":
 
             # Convert the result to a DataFrame
         df = pd.DataFrame(output, columns=[
-                "id", "route_date", "route_name", "route_link", "bus_name", "bus_type", "departing_time", "duration",
-                "reaching_time", "departure_place", "destination_place", "star_rating", "number_of_customer_reviews",
-                "price", "deal_price", "seats_available", "window_seats"
-            ])
 
-            # Handle NaN values for 'star_rating' and 'number_of_customer_reviews'
-        df['star_rating'].fillna(0, inplace=True)  # Replace NaN with 0 in star_rating
-        df['number_of_customer_reviews'].fillna(0, inplace=True)  # Replace NaN with 0 in number_of_customer_reviews
+            "id", "route_date", "route_name", "route_link", "bus_name", "bus_type", "departing_time", "duration",
 
-            # Convert 'departing_time' and 'reaching_time' columns to time format
+            "reaching_time", "departure_place", "destination_place", "star_rating", "number_of_customer_reviews",
+
+            "price", "deal_price", "seats_available", "window_seats"
+
+        ])
+
+
+
+    
+        # Step 3: Convert 'departing_time' and 'reaching_time' columns to time format
+
         df['departing_time'] = df['departing_time'].apply(lambda x: (pd.Timestamp('today') + x).time())
+
         df['reaching_time'] = df['reaching_time'].apply(lambda x: (pd.Timestamp('today') + x).time())
 
+                # Convert 'duration' (e.g. '04h 00m') to total minutes
+        def convert_to_minutes(duration):
+            duration = duration.replace('h', '').replace('m', '').strip()
+            hours, minutes = map(int, duration.split())
+            return hours * 60 + minutes
+
         
-            # Create scatter plot based on filtered data
-        fig1 = px.scatter(df,
-                            x='price',
-                            y='number_of_customer_reviews',
-                            color='bus_type',
-                            size='star_rating',
-                            hover_name='bus_name',
-                            title='Bus Price vs Customer Reviews',
-                            labels={'price': 'Ticket Price', 'number_of_customer_reviews': 'Reviews'})
-            
-            # Display the plot in Streamlit
+        # Apply the function to convert duration
+        df['duration_minutes'] = df['duration'].apply(convert_to_minutes)
+
+        # Calculate min and max duration
+        min_duration = df['duration_minutes'].min()
+        max_duration = df['duration_minutes'].max()
+
+        print(f"Min duration: {min_duration} minutes")
+        print(f"Max duration: {max_duration} minutes")
+
+
+        # Step 6: Create scatter plot for 'Price vs Customer Reviews'
+
+        fig1 = px.scatter(
+            df,
+            x='price',
+            y='number_of_customer_reviews',
+            color='bus_type',
+            size='star_rating',
+            hover_name='bus_name',
+            title='Bus Price vs Customer Reviews',
+            labels={'price': 'Ticket Price', 'number_of_customer_reviews': 'Reviews'}
+        )
+
+        # Step 7: Filter buses with zero reviews and zero star ratings, priced <= 12,00
         zero_reviews_df = df[(df['number_of_customer_reviews'] == 0) & (df['price'] <= 12000)]
+        # Step 10: Group and count buses with zero reviews
 
-        zero_star_df = df[(df['star_rating'] == 0) & (df['price'] <= 12000)]
+        bus_count_reviews = zero_reviews_df.groupby(['bus_name', 'bus_type']).size().reset_index(name='count')        
+        fig2 = px.scatter(
+            df,
+            x='price',
+            y='duration_minutes',
+            color='bus_type',
+            size='star_rating',
+            hover_name='bus_name',
+            title='Bus Price vs duration',
+            labels={'price': 'Ticket Price', 'duration_minutes': 'duration'}
+        )
 
-    # Step 3: Group by bus type and count the number of buses with zero star rating
+        # Step 11: Plot bar chart for buses with zero reviews
+
+        fig3 = px.bar(
+            bus_count_reviews, 
+            x='bus_type', 
+            y='count', 
+            color='bus_type', 
+            title='Count of Buses with Zero Reviews (Price <= 12,000)',
+            labels={'bus_type': 'Bus Type', 'count': 'Bus Count'},
+            hover_data=['bus_name'],
+            color_discrete_map={'government': 'blue', 'private': 'orange'}
+        )
+
         
-        # Step 4: Plot the bar chart
+
+        # Step 13: Display plots in Streamlit
+
+        st.plotly_chart(fig1) 
         
-        # Step 1: Group by both 'bus_name' and 'bus_type' to get details of buses with zero star ratings
-        bus_count_star = zero_star_df.groupby(['bus_name', 'bus_type']).size().reset_index(name='count')
-
-        # Step 2: Plot the bar chart for buses with zero star ratings
-        fig2 = px.bar(bus_count_star, 
-                    x='bus_type', 
-                    y='count', 
-                    color='bus_type', 
-                    title='Count of Buses with Zero Star Ratings (Price <= 12,000)',
-                    labels={'bus_type': 'Bus Type', 'count': 'Bus Count'},
-                    hover_data=['bus_name'],  # Adding bus_name to hover data for details
-                    color_discrete_map={'government': 'blue', 'private': 'orange'})
-
-        # Step 3: Group by both 'bus_name' and 'bus_type' to get details of buses with zero reviews
-        bus_count_reviews = zero_reviews_df.groupby(['bus_name', 'bus_type']).size().reset_index(name='count')
-
-        # Step 4: Plot the bar chart for buses with zero reviews
-        fig3 = px.bar(bus_count_reviews, 
-                    x='bus_type', 
-                    y='count', 
-                    color='bus_type', 
-                    title='Count of Buses with Zero Reviews (Price <= 12,000)',
-                    labels={'bus_type': 'Bus Type', 'count': 'Bus Count'},
-                    hover_data=['bus_name'],  # Adding bus_name to hover data for details
-                    color_discrete_map={'government': 'blue', 'private': 'orange'})
-
-
-
-
-            # Step 3: Group by price range and bus type, then count buses for each category
-    
-        # Optional: Combine zero star ratings and zero reviews into a single plot (if needed)
-    
-        # Step 5: Show the plots
-        st.plotly_chart(fig1)
         st.plotly_chart(fig2)
         st.plotly_chart(fig3)
+
+
+
         # Close the cursor and connection
         mycursor.close()
         mydb.close()
