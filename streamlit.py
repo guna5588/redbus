@@ -205,11 +205,14 @@ if menu=="Home":
     st.text(f"Zero reviews: {zero_reviews.shape[0]} buses | Zero star ratings: {zero_star_ratings.shape[0]} buses")
     st.text(f"Buses with both zero reviews and star ratings: {zero_both.shape[0]} buses")
 
+    colors_map = {'government': 'darkblue', 'private': 'goldenrod'}  
+
     # Additional scatter plots: Star Rating vs Reviews
     fig5 = px.scatter(dfbus, 
                     x='star_rating', 
                     y='number_of_customer_reviews', 
                     color='bus_category',
+                    color_discrete_map=colors_map,
                     size='price',
                     hover_name='bus_name',
                     title='Star Rating vs Number of Customer Reviews',
@@ -300,14 +303,100 @@ if menu=="Home":
     st.plotly_chart(fig8)
     st.plotly_chart(fig9)
 
-    #Function to plot Customer Reviews vs Star Rating
-    
-    
+        # Filter zero reviews buses and government buses
+    zero_reviews_df = dfbus[(dfbus['number_of_customer_reviews'] == 0) & (dfbus['price'] <= 12000)]
 
-    
-    
-# Color map for bus types with strong contrast
-    
+        # Define time frame classification
+    time_format = {
+            "00:00 - 06:00": ("00:00:00", "06:00:00"),
+            "06:00 - 12:00": ("06:00:00", "12:00:00"),
+            "12:00 - 18:00": ("12:00:00", "18:00:00"),
+            "18:00 - 24:00": ("18:00:00", "24:00:00")
+        }
+
+        # Function to classify the time into time frames
+    def classify_time_frame(time_str):
+            time = pd.to_datetime(time_str, format='%H:%M', errors='coerce').time()
+            for key, (start, end) in time_format.items():
+                if start <= str(time) < end:
+                    return key
+            return None
+
+        # Apply the time frame classification to reaching time
+    zero_reviews_df['time_frame'] = zero_reviews_df['reaching_time'].apply(classify_time_frame)
+
+        # Filter for government buses
+    gov_zero_reviews = zero_reviews_df[zero_reviews_df['bus_category'] == 'government']
+
+        # Define function to classify buses by government company (APSRTC, KSRTC, etc.)
+    def classify_gov_bus(bus_name):
+            if 'APSRTC' in bus_name:
+                return 'APSRTC'
+            elif 'KSRTC' in bus_name:
+                return 'KSRTC'
+            elif 'CTU' in bus_name:
+                return 'CTU'
+            elif 'UPSRTC' in bus_name:
+                return 'UPSRTC'
+            elif 'RSRTC' in bus_name:
+                return 'RSRTC'
+            elif 'BSRTC' in bus_name:
+                return 'BSRTC'
+            elif 'PEPSU' in bus_name:
+                return 'PEPSU'
+            elif 'TSRTC' in bus_name:
+                return 'TSRTC'
+            elif 'HRTC' in bus_name:
+                return 'HRTC'
+            elif 'Assam State Transport Corporation' in bus_name:
+                return 'Assam State Transport Corporation'
+            elif 'KAAC' in bus_name:
+                return 'KAAC'
+            elif 'KTCL' in bus_name:
+                return 'KTCL'
+            elif 'SNT' in bus_name:
+                return 'SNT'
+            elif 'TGSRTC' in bus_name:
+                return 'TGSRTC'
+            else:
+                return 'Other'
+
+        # Apply the government bus classification
+    gov_zero_reviews['gov_company'] = gov_zero_reviews['bus_name'].apply(classify_gov_bus)
+
+        # Group by time frame and bus company, then count
+    bus_count_by_time_company = gov_zero_reviews.groupby(['time_frame', 'gov_company']).size().reset_index(name='bus_count')
+
+        # Sort time frames in the correct order
+    time_order = ['00:00 - 06:00', '06:00 - 12:00', '12:00 - 18:00', '18:00 - 24:00']
+    bus_count_by_time_company['time_frame'] = pd.Categorical(bus_count_by_time_company['time_frame'], categories=time_order, ordered=True)
+    bus_count_by_time_company = bus_count_by_time_company.sort_values('time_frame')
+
+        # Plot a stacked bar chart
+    fig4 = px.bar(bus_count_by_time_company, 
+                    x='time_frame', 
+                    y='bus_count', 
+                    color='gov_company',
+                    title='Government Buses with Zero Reviews by Time Frame and Company',
+                    labels={'time_frame': 'Time Frame', 'bus_count': 'Bus Count (Zero Reviews)', 'gov_company': 'Government Company'},
+                    category_orders={'time_frame': time_order})
+
+        # Display the chart
+    st.plotly_chart(fig4)
+    # Group by government company and sum the bus counts
+    gov_company_bus_count = bus_count_by_time_company.groupby('gov_company')['bus_count'].sum().reset_index()
+
+    # Create a pie chart showing the distribution of bus counts by government company
+    fig_pie5 = px.pie(gov_company_bus_count, 
+                    names='gov_company', 
+                    values='bus_count', 
+                    title='Distribution of Government Buses with Zero Reviews by Company',
+                    labels={'gov_company': 'Government Company', 'bus_count': 'Bus Count (Zero Reviews)'})
+
+    # Display the pie chart
+    st.plotly_chart(fig_pie5)
+
+
     
     
     
@@ -501,6 +590,7 @@ if menu == "Bus Routes":
         
         st.plotly_chart(fig2)
         st.plotly_chart(fig3)
+
 
 
 
