@@ -1,27 +1,22 @@
 import pandas as pd
 import mysql.connector
-import matplotlib.pyplot as plt
+import streamlit as st
 import streamlit as st 
 from streamlit_option_menu import option_menu  #used for selecting an option from list of options in a menu
 import plotly.express as px 
-import plotly.graph_objects as go
-from tabulate import tabulate
-from datetime import time
- 
-#each bus we have to filter
-#now we have to take route_name from each dataframe and then append to list
-# Traverse through each row and append the 'Route_name' to the kerala list
-#kerala bus
-kerala=[]
-df_k=pd.read_csv("h:/guvi_txt/new/kerala_data.csv")
-for i,r in df_k.iterrows():  #traverse through each row
+
+# Each bus we have to filter
+# Now we have to take route_name from each dataframe and then append to list
+# Kerala bus
+kerala = []
+df_k = pd.read_csv("h:/guvi_txt/new/kerala_data.csv")
+for i, r in df_k.iterrows():  # traverse through each row
     kerala.append(r['Route_name'])   # add that row in new list
 
-
-#Andhra bus
-andhra=[]
-df_a=pd.read_csv("h:/guvi_txt/new/andra_data.csv")
-for i,r in df_a.iterrows():
+# Andhra bus
+andhra = []
+df_a = pd.read_csv("h:/guvi_txt/new/andra_data.csv")
+for i, r in df_a.iterrows():
     andhra.append(r['Route_name'])
 
 #Assam bus
@@ -85,47 +80,12 @@ df_sk=pd.read_csv("h:/guvi_txt/new/bihar_data.csv")
 for i,r in df_sk.iterrows():
     bihar.append(r['Route_name'])
 
-###############################################
 
-# ---------------> STREAMLIT PART ------------>
-
-###############################################
-
-
-
-#setting streamlit page
-st.set_page_config(layout="wide",page_icon=":material/directions_bus:",page_title="RedBus Project",initial_sidebar_state="expanded")
-
-st.markdown(
-    """
-    <style>
-    /* Ensure font size does not change on hover */
-    .nav-link {
-        font-size: 18px !important;
-    }
-    .nav-link:hover {
-        font-size: 18px !important;
-        color: #32789e !important; /* Change only the color on hover */
-    }
-    .nav-link-selected {
-        font-size: 20px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-
+# Setting streamlit page
+st.set_page_config(layout="wide", page_icon=":material/directions_bus:", page_title="RedBus Project", initial_sidebar_state="expanded")
 
 # Theme button in the sidebar
-
-
-
 with st.sidebar:
-    #THEME CONTROL  OPERATIONAL IN SIDEBAR
-    
-    
     menu = option_menu(
         "Main Menu", 
         ["Home", 'Bus Routes'], 
@@ -133,10 +93,9 @@ with st.sidebar:
         menu_icon="cast", 
         default_index=0,
         styles={
-            "icon":{"font-size":"25px"}
+            "icon": {"font-size": "25px"}
         }
     )
-
 
 if menu=="Home":
     st.title(":red[:material/analytics:] :green[Redbus Data Scraping with Selenium  & Dynamic Filtering using Streamlit]")
@@ -397,59 +356,35 @@ if menu=="Home":
     st.plotly_chart(fig_pie5)
 
 
-    
-    
-    
-# "Bus Routes" Section (already implemented, no changes needed here)
+# "Bus Routes" Section
 if menu == "Bus Routes":
-    
-    st.title(" :blue[:material/filter_alt:] :red[Dynamic Filtering of Data]")
+    st.title(":blue[:material/filter_alt:] :red[Dynamic Filtering of Data]")
     
     col1, col2 = st.columns(2)
 
-    
-    # Define the filters for rating, fare range, and bus type
-        
-
-
-    
-# Define the filtering function
-    def type_and_fare(bus_type, fare_min, fare_max, rate_range, bus_name, selected_departing_time):
-        # Time format dictionary
+    # Define the filtering function
+    def type_and_fare(bus_type, fare_min, fare_max, rate_min, rate_max, bus_name, selected_departing_time, route_name):
+        # Define time format dictionary to handle different time ranges
         time_format = {
-            "06:00 - 12:00 Morning": ("06:00:00", "12:00:00"),
-            "12:00 - 18:00 Afternoon": ("12:00:00", "18:00:00"),
-            "18:00 - 24:00 Evening": ("18:00:00", "24:00:00"),
-            "00:00 - 06:00 Night": ("00:00:00", "06:00:00")
+            "06:00:00 - 12:00:00 Morning": ("06:00:00", "12:00:00"),
+            "12:00:00 - 18:00:00 Afternoon": ("12:00:00", "18:00:00"),
+            "18:00:00 - 24:00:00 Evening": ("18:00:00", "24:00:00"),
+            "00:00:00 - 06:00:00 Night": ("00:00:00", "06:00:00")
         }
 
         # Fetch the selected time range from the selectbox
-        if selected_departing_time in time_format:
-            start_time, end_time = time_format[selected_departing_time]
-        else:
-            start_time, end_time = None, None  # Handle cases where no time range is selected
+        start_time, end_time = time_format.get(selected_departing_time, (None, None))
 
         # MySQL connection
         mydb = mysql.connector.connect(
-            host="localhost",
+            host="localhost",  # Ensure your host is correct
             user="root",
             password="",
             database="coombined_data"  # Ensure your database name is correct
         )
-
         mycursor = mydb.cursor(buffered=True)
 
-        # Filtration for rating
-        if rate_range == "5":
-            rate_min, rate_max = 4.1, 5
-        elif rate_range == '4':
-            rate_min, rate_max = 3.1, 4.0
-        elif rate_range == "rating not an issue":
-            rate_min, rate_max = 2.0, 5
-        else:
-            rate_min, rate_max = 0, 5
-
-        # Route name filtration
+        # Route name filtration for government and private buses
         if bus_name == "government":
             bus_name_option = """
                 (bus_name LIKE '%APSRTC%' OR bus_name LIKE '%KSRTC%' OR bus_name LIKE '%CTU%' OR 
@@ -467,7 +402,7 @@ if menu == "Bus Routes":
                 bus_name NOT LIKE '%KTCL%' AND bus_name NOT LIKE '%SNT%' AND bus_name NOT LIKE '%TGSRTC%')
             """
 
-        # Define bus type condition
+        # Bus type condition
         if bus_type == "sleeper":
             bus_type_option = "bus_type LIKE '%Sleeper%'"
         elif bus_type == "semi-sleeper":
@@ -475,53 +410,44 @@ if menu == "Bus Routes":
         elif bus_type == "seater":
             bus_type_option = "bus_type LIKE '%Seater%'"
         else:
-            bus_type_option = """
-                (bus_type NOT LIKE '%Sleeper%' AND bus_type NOT LIKE '%Semi-Sleeper%' AND bus_type NOT LIKE '%Seater%')
-            """
+            bus_type_option = "bus_type NOT LIKE '%Sleeper%' AND bus_type NOT LIKE '%Semi-Sleeper%' AND bus_type NOT LIKE '%Seater%'"
 
         # SQL query to fetch data based on the filters
         mysql_query = f"""
-            SELECT id, route_date, route_name, route_link, bus_name, bus_type, departing_time, duration, reaching_time, 
-                departure_place, destination_place, star_rating, number_of_customer_reviews, price, deal_price, 
-                seats_available, window_seats
+            SELECT id, route_date, route_name, route_link, bus_name, bus_type, 
+            TIME_FORMAT(departing_time, '%H:%i:%s') AS departing_time, 
+            duration, TIME_FORMAT(reaching_time, '%H:%i:%s') AS reaching_time, 
+            departure_place, destination_place, star_rating, 
+            number_of_customer_reviews, price, deal_price, seats_available, window_seats
             FROM combined_table
             WHERE price BETWEEN {fare_min} AND {fare_max}
             AND {bus_name_option}
             AND {bus_type_option}
-            AND route_name = '{k}'
-            
+            AND route_name = '{route_name}'
         """
+
+        # Add star rating filter
+        mysql_query += f" AND star_rating BETWEEN {rate_min} AND {rate_max}"
+
         if start_time and end_time:
             mysql_query += f" AND TIME(departing_time) BETWEEN '{start_time}' AND '{end_time}'"
 
-        mysql_query += f"""
-            AND star_rating BETWEEN {rate_min} AND {rate_max}
-            ORDER BY price DESC, departing_time ASC;
-        """
-        
+        # Order results by price descending and departing time ascending
+        mysql_query += " ORDER BY price DESC, TIME(departing_time) ASC;"
+
+        # Execute the query
         mycursor.execute(mysql_query)
         output = mycursor.fetchall()
 
-            # Convert the result to a DataFrame
+        # Convert the result to a DataFrame
         df = pd.DataFrame(output, columns=[
-
-            "id", "route_date", "route_name", "route_link", "bus_name", "bus_type", "departing_time", "duration",
-
-            "reaching_time", "departure_place", "destination_place", "star_rating", "number_of_customer_reviews",
-
+            "id", "route_date", "route_name", "route_link", "bus_name", "bus_type", 
+            "departing_time", "duration", "reaching_time", "departure_place", 
+            "destination_place", "star_rating", "number_of_customer_reviews", 
             "price", "deal_price", "seats_available", "window_seats"
-
         ])
 
-
-
-    
-        # Step 3: Convert 'departing_time' and 'reaching_time' columns to time format
-
-        df['departing_time'] = df['departing_time'].apply(lambda x: (pd.Timestamp('today') + x).time())
-
-        df['reaching_time'] = df['reaching_time'].apply(lambda x: (pd.Timestamp('today') + x).time())
-
+        # Close the cursor and database connection
                 # Convert 'duration' (e.g. '04h 00m') to total minutes
         def convert_to_minutes(duration):
             duration = duration.replace('h', '').replace('m', '').strip()
@@ -591,13 +517,10 @@ if menu == "Bus Routes":
         st.plotly_chart(fig2)
         st.plotly_chart(fig3)
 
-
-
-
-        # Close the cursor and connection
         mycursor.close()
         mydb.close()
-        return(df)
+
+        return df
     
 
 
@@ -605,8 +528,11 @@ if menu == "Bus Routes":
 
 
 
-    # Separate government and private buses into different tables (run this separately)
-        # Streamlit UI code
+
+
+
+
+
 
     # Main layout for the bus filters
     st.title("Bus Search Filters") 
@@ -623,26 +549,17 @@ if menu == "Bus Routes":
 
     # Range slider for fare
     with col1:
-        select_fare = st.slider("Choose bus fare range", min_value=100, max_value=11500, value=(40, 400), step=10)
+        select_fare = st.slider("Choose bus fare range", min_value=100, max_value=12000, value=(40, 400), step=10)
 
     # Dropdown for selecting the rating
     with col2:
-        select_rating = st.selectbox("Choose star_rating", ["5", "4", "rating not an issue", "off"])
+        select_rating = st.slider("Choose star rating range", min_value=0.0, max_value=5.0, value=(2.0, 5.0), step=0.1)
 
-    # Range slider for selecting time (in 24-hour format)
     with col1:
-        # Streamlit selectbox for departure time range
-        departure_time_options = ["", "06:00 - 12:00 Morning", "12:00 - 18:00 Afternoon", "18:00 - 24:00 Evening", "00:00 - 06:00 Night"]
-        selected_departure_time = st.selectbox(
-            "Departure Time",
-            options=departure_time_options,
-            index=departure_time_options.index(st.session_state.selected_departure_time) if 'selected_departure_time' in st.session_state else 0,
-            key='selected_departure_time'
+        selected_departing_time = st.selectbox(
+            "Select Departure Time Range",
+            ["00:00:00 - 06:00:00 Night", "06:00:00 - 12:00:00 Morning", "12:00:00 - 18:00:00 Afternoon", "18:00:00 - 24:00:00 Evening"]
         )
-
-# Handle the SQL query with proper time range
-
-
 
     # Sidebar to filter between government and private buses
     with st.sidebar:
@@ -653,46 +570,38 @@ if menu == "Bus Routes":
     st.write(f"Selected Bus Type: {select_type}")
     st.write(f"Selected Fare Range: {select_fare[0]} - {select_fare[1]}")
     st.write(f"Selected Rating: {select_rating}")
-    st.write(f"Selected Time format: {selected_departure_time}")
+    st.write(f"Selected Time format: {selected_departing_time}")
     st.write(f"Selected Bus Ownership: {bus_name_option}")
 
-    
-
-
     # Kerala Bus Filtering
-    
     if state == "kerala":
         with col2:
             k = st.selectbox("List of routes", kerala)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
-       
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
         # Display the result in Streamlit
         st.subheader(":green[Result]")
         st.dataframe(df_result, use_container_width=True)
-    # Kerala Bus Filtering
-    
+
     if state == "Andhra Pradesh":
         with col2:
             k = st.selectbox("List of routes", andhra)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
-       
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
         # Display the result in Streamlit
         st.subheader(":green[Result]")
         st.dataframe(df_result, use_container_width=True)
-    
 
-    # telungana Bus Filtering
+     # telungana Bus Filtering
     
     if state =="Telangana":
         with col2:
             k = st.selectbox("List of routes", telungana)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -704,7 +613,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", Meghalaya)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -716,7 +625,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", Sikkim)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -728,7 +637,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", goa)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -740,7 +649,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", KAAC)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -752,7 +661,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", assam)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -764,7 +673,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", rajasthan)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -776,7 +685,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", bihar)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -788,7 +697,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", Chandigarh)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
@@ -800,7 +709,7 @@ if menu == "Bus Routes":
             k = st.selectbox("List of routes", punjab)
         
         # Call the function to get the filtered data
-        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating, bus_name_option, selected_departure_time)
+        df_result = type_and_fare(select_type, select_fare[0], select_fare[1], select_rating[0], select_rating[1], bus_name_option, selected_departing_time, k)
        
         # Display the result in Streamlit
         st.subheader(":green[Result]")
